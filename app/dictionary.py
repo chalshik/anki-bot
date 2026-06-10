@@ -39,7 +39,7 @@ def _get_client() -> genai.Client:
 async def fetch_definition(word: str) -> dict | None:
     try:
         resp = await _get_client().aio.models.generate_content(
-            model="gemini-2.0-flash-001",
+            model="gemini-2.5-flash",
             contents=word.lower().strip(),
             config=_CONFIG,
         )
