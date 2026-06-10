@@ -43,10 +43,17 @@ async def fetch_definition(word: str) -> dict | None:
             contents=word.lower().strip(),
             config=_CONFIG,
         )
-        data = json.loads(resp.text)
+        raw = resp.text.strip()
+        # gemini-2.5-flash sometimes wraps JSON in markdown fences despite
+        # response_mime_type="application/json" — strip them if present
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1]  # drop opening fence line
+            raw = raw.rsplit("```", 1)[0]  # drop closing fence
+        data = json.loads(raw)
     except Exception as e:
         logger.error("Gemini lookup failed for %r: %s", word, e)
         return None
+
 
     if not data.get("found"):
         return None
