@@ -24,7 +24,8 @@ def _register_handlers(application: Application) -> None:
     application.add_handler(CommandHandler("help", help.handle_help))
     application.add_handler(CommandHandler("quiz", quiz.handle_quiz))
     application.add_handler(CommandHandler("words", words.handle_words))
-    application.add_handler(CommandHandler("delete", words.handle_delete))
+    application.add_handler(CommandHandler("delete", delete.handle_delete))
+
     application.add_handler(CommandHandler("settings", settings.handle_settings))
     application.add_handler(CommandHandler("cleanup", cleanup.handle_cleanup))
     application.add_handler(CommandHandler("upload", upload.handle_upload_command))
