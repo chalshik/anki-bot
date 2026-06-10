@@ -3,8 +3,8 @@ uvicorn[standard]
 python-telegram-bot==20.*
 supabase>=2.0.0
 fsrs
-httpx
 python-dotenv
 alembic
 psycopg2-binary
 sqlalchemy
+google-cloud-aiplatform

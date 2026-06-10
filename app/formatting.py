@@ -17,6 +17,7 @@ def format_card(
     examples: Optional[list[str]] = None,
     example: Optional[str] = None,
     synonyms: Optional[list[str]] = None,
+    translation: Optional[str] = None,
 ) -> str:
     """Render the HTML body for a word.
 
@@ -36,5 +37,8 @@ def format_card(
     if settings.get("show_synonyms", True) and syn_list:
         joined = ", ".join(html.escape(s) for s in syn_list)
         lines.append(f"🔁 Synonyms: {joined}")
+
+    if translation:
+        lines.append(f"🇷🇺 {html.escape(translation)}")
 
     return "\n".join(lines)

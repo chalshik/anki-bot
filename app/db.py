@@ -76,6 +76,7 @@ async def save_word(
     examples: Optional[list[str]] = None,
     synonyms: Optional[list[str]] = None,
     part_of_speech: Optional[str] = None,
+    translation: Optional[str] = None,
 ) -> dict:
     word_result = await _run(
         lambda: _db().table("words").insert({
@@ -86,6 +87,7 @@ async def save_word(
             "examples": examples,
             "synonyms": synonyms,
             "part_of_speech": part_of_speech,
+            "translation": translation,
         }).execute()
     )
     word_row = word_result.data[0]

@@ -22,6 +22,7 @@ words = sa.Table(
     sa.Column("examples", sa.ARRAY(sa.Text)),
     sa.Column("synonyms", sa.ARRAY(sa.Text)),
     sa.Column("part_of_speech", sa.Text),
+    sa.Column("translation", sa.Text),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
     sa.UniqueConstraint("user_id", "word", name="uq_words_user_word"),
 )

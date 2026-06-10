@@ -1,72 +1,64 @@
-import httpx
+import asyncio
+import json
+import os
 
-_BASE = "https://freedictionaryapi.com/api/v1/entries/en"
+import vertexai
+from vertexai.generative_models import GenerativeModel, GenerationConfig
 
-_MAX_EXAMPLES = 3
-_MAX_SYNONYMS = 5
+_model: GenerativeModel | None = None
+
+_SYSTEM = (
+    "You are a precise English dictionary. Return only JSON with these keys: "
+    "found (bool), definition (one concise sentence), part_of_speech (noun/verb/adjective/adverb/etc), "
+    "examples (array of up to 3 natural usage sentences), synonyms (array of up to 5), "
+    "translation (Russian translation, 1-3 words). "
+    'If the input is not a real English word, return {"found": false}.'
+)
+
+_CONFIG = GenerationConfig(
+    response_mime_type="application/json",
+    temperature=0.1,
+    max_output_tokens=300,
+)
+
+
+def _get_model() -> GenerativeModel:
+    global _model
+    if _model is None:
+        vertexai.init(
+            project=os.environ["GCP_PROJECT_ID"],
+            location=os.environ.get("GCP_LOCATION", "us-central1"),
+        )
+        _model = GenerativeModel("gemini-1.5-flash", system_instruction=_SYSTEM)
+    return _model
 
 
 async def fetch_definition(word: str) -> dict | None:
-    """Look up an English word via the Wiktionary-backed Free Dictionary API.
-
-    Returns a dict with definition, examples, synonyms and part of speech, or
-    None if the word can't be found / the request fails. Note: unknown words
-    return HTTP 200 with an empty ``entries`` list, not a 404.
-    """
-    url = f"{_BASE}/{word.lower().strip()}"
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        try:
-            resp = await client.get(url)
-        except httpx.RequestError:
-            return None
-
-    if resp.status_code != 200:
-        return None
-
     try:
-        data = resp.json()
-    except ValueError:
+        resp = await asyncio.to_thread(
+            _get_model().generate_content,
+            word.lower().strip(),
+            generation_config=_CONFIG,
+        )
+        data = json.loads(resp.text)
+    except Exception:
         return None
 
-    entries = data.get("entries") or []
-    if not entries:
+    if not data.get("found"):
         return None
 
-    return _parse_entries(entries)
-
-
-def _parse_entries(entries: list[dict]) -> dict | None:
-    # Use the first entry for the headline definition / part of speech, but
-    # gather examples and synonyms across all of its senses.
-    entry = entries[0]
-    senses = entry.get("senses") or []
-
-    definition = ""
-    for sense in senses:
-        if sense.get("definition"):
-            definition = sense["definition"]
-            break
-
+    definition = data.get("definition", "").strip()
     if not definition:
         return None
 
-    examples: list[str] = []
-    synonyms: list[str] = []
-    for sense in senses:
-        for ex in sense.get("examples") or []:
-            if ex and ex not in examples:
-                examples.append(ex)
-        for syn in sense.get("synonyms") or []:
-            if syn and syn not in synonyms:
-                synonyms.append(syn)
-
-    examples = examples[:_MAX_EXAMPLES]
-    synonyms = synonyms[:_MAX_SYNONYMS]
+    examples = (data.get("examples") or [])[:3]
+    synonyms = (data.get("synonyms") or [])[:5]
 
     return {
         "definition": definition,
-        "example": examples[0] if examples else None,  # back-compat
+        "example": examples[0] if examples else None,
         "examples": examples,
-        "part_of_speech": entry.get("partOfSpeech", ""),
+        "part_of_speech": data.get("part_of_speech", ""),
         "synonyms": synonyms,
+        "translation": data.get("translation", ""),
     }

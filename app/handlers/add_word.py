@@ -29,6 +29,7 @@ async def handle_add_word(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             examples=existing.get("examples"),
             example=existing.get("example"),
             synonyms=existing.get("synonyms"),
+            translation=existing.get("translation"),
         )
         await update.message.reply_text(
             f"📖 {body}\n\n<i>Already in your deck — next review: {due_display}</i>",
@@ -53,6 +54,7 @@ async def handle_add_word(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         examples=result.get("examples"),
         synonyms=result.get("synonyms"),
         part_of_speech=result.get("part_of_speech"),
+        translation=result.get("translation"),
     )
 
     body = format_card(
@@ -63,6 +65,7 @@ async def handle_add_word(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         examples=result.get("examples"),
         example=result.get("example"),
         synonyms=result.get("synonyms"),
+        translation=result.get("translation"),
     )
     await update.message.reply_text(
         f"📖 {body}\n\n✅ Saved to your deck",

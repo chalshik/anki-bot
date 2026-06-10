@@ -149,6 +149,7 @@ async def _send_card_back(send_fn, card_row: dict, settings: dict) -> None:
         examples=w.get("examples"),
         example=w.get("example"),
         synonyms=w.get("synonyms"),
+        translation=w.get("translation"),
     )
     text = f"{body}\n\nHow did you do?"
 
