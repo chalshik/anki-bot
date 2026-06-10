@@ -124,6 +124,42 @@ async def delete_word(user_id: int, word: str) -> bool:
     return bool(result.data)
 
 
+async def get_words_by_due_desc(user_id: int, page: int, page_size: int = 10) -> tuple[list[dict], int]:
+    """Words sorted by furthest due date first — best candidates to delete."""
+    offset = page * page_size
+    # Fetch all words with cards so we can sort by due in Python
+    # (Supabase JS client doesn't support ordering by a nested relation column)
+    result = await _run(
+        lambda: _db().table("words")
+        .select("*, cards(*)", count="exact")
+        .eq("user_id", user_id)
+        .execute()
+    )
+    all_words = result.data or []
+    total = result.count or 0
+
+    def _due_key(w: dict) -> str:
+        card = w["cards"][0] if w.get("cards") else {}
+        return card.get("due", "")
+
+    all_words.sort(key=_due_key, reverse=True)
+    return all_words[offset: offset + page_size], total
+
+
+async def delete_words_batch(user_id: int, word_ids: list[str]) -> int:
+    """Delete multiple words by UUID list. Returns count deleted."""
+    if not word_ids:
+        return 0
+    result = await _run(
+        lambda: _db().table("words")
+        .delete()
+        .eq("user_id", user_id)
+        .in_("id", word_ids)
+        .execute()
+    )
+    return len(result.data or [])
+
+
 # ---------- cards ----------
 
 async def get_due_cards(user_id: int, limit: int = 20) -> list[dict]:

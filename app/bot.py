@@ -13,6 +13,13 @@ from .handlers.words import handle_words, handle_words_page
 from .handlers.delete import handle_delete
 from .handlers.start_help import handle_start, handle_help
 from .handlers.settings import handle_settings, handle_toggle_setting
+from .handlers.cleanup import (
+    handle_cleanup,
+    handle_cleanup_page,
+    handle_cleanup_toggle,
+    handle_cleanup_confirm,
+    handle_cleanup_cancel,
+)
 
 
 def create_application(token: str, use_updater: bool = True) -> Application:
@@ -31,11 +38,16 @@ def _register_handlers(app: Application) -> None:
     app.add_handler(CommandHandler("words", handle_words))
     app.add_handler(CommandHandler("delete", handle_delete))
     app.add_handler(CommandHandler("settings", handle_settings))
+    app.add_handler(CommandHandler("cleanup", handle_cleanup))
 
     app.add_handler(CallbackQueryHandler(handle_show_answer, pattern=r"^show:"))
     app.add_handler(CallbackQueryHandler(handle_rate, pattern=r"^rate:"))
     app.add_handler(CallbackQueryHandler(handle_words_page, pattern=r"^words_page:"))
     app.add_handler(CallbackQueryHandler(handle_toggle_setting, pattern=r"^setting:"))
+    app.add_handler(CallbackQueryHandler(handle_cleanup_page, pattern=r"^cleanup_page:"))
+    app.add_handler(CallbackQueryHandler(handle_cleanup_toggle, pattern=r"^cleanup_toggle:"))
+    app.add_handler(CallbackQueryHandler(handle_cleanup_confirm, pattern=r"^cleanup_confirm$"))
+    app.add_handler(CallbackQueryHandler(handle_cleanup_cancel, pattern=r"^cleanup_cancel$"))
 
     # Must be last — catches all non-command text messages
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_word))
