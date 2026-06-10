@@ -7,6 +7,8 @@ users = sa.Table(
     metadata,
     sa.Column("id", sa.BigInteger, primary_key=True),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
+    sa.Column("show_synonyms", sa.Boolean, nullable=False, server_default=sa.text("true")),
+    sa.Column("show_examples", sa.Boolean, nullable=False, server_default=sa.text("true")),
 )
 
 words = sa.Table(
@@ -17,6 +19,9 @@ words = sa.Table(
     sa.Column("word", sa.Text, nullable=False),
     sa.Column("definition", sa.Text),
     sa.Column("example", sa.Text),
+    sa.Column("examples", sa.ARRAY(sa.Text)),
+    sa.Column("synonyms", sa.ARRAY(sa.Text)),
+    sa.Column("part_of_speech", sa.Text),
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()")),
     sa.UniqueConstraint("user_id", "word", name="uq_words_user_word"),
 )

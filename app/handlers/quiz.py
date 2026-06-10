@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -9,6 +10,7 @@ from fsrs import Scheduler, Rating
 
 from .. import db
 from ..fsrs_utils import card_from_row
+from ..formatting import format_card
 
 _scheduler = Scheduler()
 
@@ -74,7 +76,8 @@ async def handle_show_answer(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.edit_message_text("Session mismatch. Run /quiz to start again.")
         return
 
-    await _send_card_back(query.edit_message_text, card_row)
+    settings = await db.get_user_settings(user_id)
+    await _send_card_back(query.edit_message_text, card_row, settings)
 
 
 async def handle_rate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -125,34 +128,36 @@ def _find_card(session: _QuizSession, card_id: str) -> dict | None:
 
 
 async def _send_card_front(send_fn, card_row: dict) -> None:
-    word = card_row["words"]["word"]
+    word = html.escape(card_row["words"]["word"])
     markup = InlineKeyboardMarkup([[
         InlineKeyboardButton("👁 Show answer", callback_data=f"show:{card_row['id']}")
     ]])
     await send_fn(
-        f'What does *"{word}"* mean?',
-        parse_mode="Markdown",
+        f'What does <b>"{word}"</b> mean?',
+        parse_mode="HTML",
         reply_markup=markup,
     )
 
 
-async def _send_card_back(send_fn, card_row: dict) -> None:
+async def _send_card_back(send_fn, card_row: dict, settings: dict) -> None:
     w = card_row["words"]
-    word = w["word"]
-    definition = w.get("definition", "")
-    example = w.get("example")
-    pos = w.get("part_of_speech", "")
-
-    header = f"*{word}*" + (f" _({pos})_" if pos else "")
-    example_line = f'\n_{chr(34)}{example}{chr(34)}_' if example else ""
-    text = f"{header}\n{definition}{example_line}\n\nHow did you do?"
+    body = format_card(
+        w["word"],
+        w.get("definition", ""),
+        settings,
+        part_of_speech=w.get("part_of_speech") or "",
+        examples=w.get("examples"),
+        example=w.get("example"),
+        synonyms=w.get("synonyms"),
+    )
+    text = f"{body}\n\nHow did you do?"
 
     buttons = [
         InlineKeyboardButton(label, callback_data=f"rate:{card_row['id']}:{r}")
         for r, label in _RATING_LABELS.items()
     ]
     markup = InlineKeyboardMarkup([buttons])
-    await send_fn(text, parse_mode="Markdown", reply_markup=markup)
+    await send_fn(text, parse_mode="HTML", reply_markup=markup)
 
 
 def _format_due(due: datetime) -> str:

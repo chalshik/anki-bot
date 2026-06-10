@@ -1,3 +1,4 @@
+import html
 from datetime import datetime, timezone
 
 from telegram import Update
@@ -5,6 +6,7 @@ from telegram.ext import ContextTypes
 
 from .. import db
 from ..dictionary import fetch_definition
+from ..formatting import format_card
 
 
 async def handle_add_word(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -12,40 +14,59 @@ async def handle_add_word(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     user_id = update.effective_user.id
 
     await db.ensure_user(user_id)
+    settings = await db.get_user_settings(user_id)
 
     existing = await db.get_word(user_id, word)
     if existing:
         card = existing["cards"][0] if existing.get("cards") else {}
         due_str = card.get("due", "")
         due_display = _format_due(due_str) if due_str else "unknown"
-        pos = f" ({existing.get('part_of_speech', '')})" if existing.get("part_of_speech") else ""
+        body = format_card(
+            existing["word"],
+            existing.get("definition", ""),
+            settings,
+            part_of_speech=existing.get("part_of_speech") or "",
+            examples=existing.get("examples"),
+            example=existing.get("example"),
+            synonyms=existing.get("synonyms"),
+        )
         await update.message.reply_text(
-            f"📖 *{existing['word']}*{pos}\n"
-            f"{existing['definition']}\n"
-            f"{chr(34) + existing['example'] + chr(34) if existing.get('example') else ''}\n\n"
-            f"_Already in your deck — next review: {due_display}_",
-            parse_mode="Markdown",
+            f"📖 {body}\n\n<i>Already in your deck — next review: {due_display}</i>",
+            parse_mode="HTML",
         )
         return
 
     result = await fetch_definition(word)
     if result is None:
         await update.message.reply_text(
-            f"❌ No definition found for *{word}*. Check the spelling and try again.",
-            parse_mode="Markdown",
+            f"❌ No definition found for <b>{html.escape(word)}</b>. "
+            f"Check the spelling and try again.",
+            parse_mode="HTML",
         )
         return
 
-    await db.save_word(user_id, word, result["definition"], result.get("example"))
+    await db.save_word(
+        user_id,
+        word,
+        result["definition"],
+        result.get("example"),
+        examples=result.get("examples"),
+        synonyms=result.get("synonyms"),
+        part_of_speech=result.get("part_of_speech"),
+    )
 
-    pos = f" ({result['part_of_speech']})" if result.get("part_of_speech") else ""
-    example_line = f'\n"{result["example"]}' + '"' if result.get("example") else ""
+    body = format_card(
+        word.lower(),
+        result["definition"],
+        settings,
+        part_of_speech=result.get("part_of_speech") or "",
+        examples=result.get("examples"),
+        example=result.get("example"),
+        synonyms=result.get("synonyms"),
+    )
     await update.message.reply_text(
-        f"📖 *{word.lower()}*{pos}\n"
-        f"{result['definition']}"
-        f"{example_line}\n\n"
-        f"✅ Saved to your deck",
-        parse_mode="Markdown",
+        f"📖 {body}\n\n✅ Saved to your deck",
+        parse_mode="HTML",
     )
 
 

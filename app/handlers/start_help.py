@@ -9,7 +9,9 @@ HELP_TEXT = (
     "/quiz — review your due cards\n"
     "/words — browse all your saved words\n"
     "/delete <word> — remove a word from your deck\n"
-    "/help — show this message"
+    "/settings — toggle synonyms & examples\n"
+    "/help — show this message\n\n"
+    "_Definitions from Wiktionary (CC BY-SA 4.0)_"
 )
 
 

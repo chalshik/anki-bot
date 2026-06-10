@@ -31,6 +31,29 @@ async def ensure_user(user_id: int) -> None:
     await _run(lambda: _db().table("users").upsert({"id": user_id}).execute())
 
 
+async def get_user_settings(user_id: int) -> dict:
+    result = await _run(
+        lambda: _db().table("users")
+        .select("show_synonyms, show_examples")
+        .eq("id", user_id)
+        .limit(1)
+        .execute()
+    )
+    row = result.data[0] if result.data else {}
+    return {
+        "show_synonyms": row.get("show_synonyms", True),
+        "show_examples": row.get("show_examples", True),
+    }
+
+
+async def update_user_setting(user_id: int, key: str, value: bool) -> None:
+    if key not in ("show_synonyms", "show_examples"):
+        raise ValueError(f"Unknown setting: {key}")
+    await _run(
+        lambda: _db().table("users").update({key: value}).eq("id", user_id).execute()
+    )
+
+
 # ---------- words ----------
 
 async def get_word(user_id: int, word: str) -> Optional[dict]:
@@ -45,13 +68,24 @@ async def get_word(user_id: int, word: str) -> Optional[dict]:
     return result.data[0] if result.data else None
 
 
-async def save_word(user_id: int, word: str, definition: str, example: Optional[str]) -> dict:
+async def save_word(
+    user_id: int,
+    word: str,
+    definition: str,
+    example: Optional[str],
+    examples: Optional[list[str]] = None,
+    synonyms: Optional[list[str]] = None,
+    part_of_speech: Optional[str] = None,
+) -> dict:
     word_result = await _run(
         lambda: _db().table("words").insert({
             "user_id": user_id,
             "word": word.lower(),
             "definition": definition,
             "example": example,
+            "examples": examples,
+            "synonyms": synonyms,
+            "part_of_speech": part_of_speech,
         }).execute()
     )
     word_row = word_result.data[0]
@@ -104,6 +138,7 @@ async def get_due_cards(user_id: int, limit: int = 20) -> list[dict]:
         .select("*, words(*)")
         .in_("word_id", word_ids)
         .lte("due", now_iso)
+        .order("due")
         .limit(limit)
         .execute()
     )
