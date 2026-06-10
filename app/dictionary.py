@@ -1,11 +1,13 @@
-import asyncio
 import json
+import logging
 import os
 
-import vertexai
-from vertexai.generative_models import GenerativeModel, GenerationConfig
+from google import genai
+from google.genai import types
 
-_model: GenerativeModel | None = None
+logger = logging.getLogger(__name__)
+
+_client: genai.Client | None = None
 
 _SYSTEM = (
     "You are a precise English dictionary. Return only JSON with these keys: "
@@ -15,33 +17,35 @@ _SYSTEM = (
     'If the input is not a real English word, return {"found": false}.'
 )
 
-_CONFIG = GenerationConfig(
+_CONFIG = types.GenerateContentConfig(
+    system_instruction=_SYSTEM,
     response_mime_type="application/json",
     temperature=0.1,
     max_output_tokens=300,
 )
 
 
-def _get_model() -> GenerativeModel:
-    global _model
-    if _model is None:
-        vertexai.init(
+def _get_client() -> genai.Client:
+    global _client
+    if _client is None:
+        _client = genai.Client(
+            vertexai=True,
             project=os.environ["GCP_PROJECT_ID"],
             location=os.environ.get("GCP_LOCATION", "us-central1"),
         )
-        _model = GenerativeModel("gemini-1.5-flash", system_instruction=_SYSTEM)
-    return _model
+    return _client
 
 
 async def fetch_definition(word: str) -> dict | None:
     try:
-        resp = await asyncio.to_thread(
-            _get_model().generate_content,
-            word.lower().strip(),
-            generation_config=_CONFIG,
+        resp = await _get_client().aio.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=word.lower().strip(),
+            config=_CONFIG,
         )
         data = json.loads(resp.text)
-    except Exception:
+    except Exception as e:
+        logger.error("Gemini lookup failed for %r: %s", word, e)
         return None
 
     if not data.get("found"):
