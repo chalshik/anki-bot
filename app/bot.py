@@ -7,19 +7,7 @@ from telegram.ext import (
     filters,
 )
 
-from .handlers.add_word import handle_add_word
-from .handlers.quiz import handle_quiz, handle_show_answer, handle_rate
-from .handlers.words import handle_words, handle_words_page
-from .handlers.delete import handle_delete
-from .handlers.start_help import handle_start, handle_help
-from .handlers.settings import handle_settings, handle_toggle_setting
-from .handlers.cleanup import (
-    handle_cleanup,
-    handle_cleanup_page,
-    handle_cleanup_toggle,
-    handle_cleanup_confirm,
-    handle_cleanup_cancel,
-)
+from .handlers import start, help, add_word, quiz, words, settings, cleanup, upload
 
 
 def create_application(token: str, use_updater: bool = True) -> Application:
@@ -31,23 +19,30 @@ def create_application(token: str, use_updater: bool = True) -> Application:
     return app
 
 
-def _register_handlers(app: Application) -> None:
-    app.add_handler(CommandHandler("start", handle_start))
-    app.add_handler(CommandHandler("help", handle_help))
-    app.add_handler(CommandHandler("quiz", handle_quiz))
-    app.add_handler(CommandHandler("words", handle_words))
-    app.add_handler(CommandHandler("delete", handle_delete))
-    app.add_handler(CommandHandler("settings", handle_settings))
-    app.add_handler(CommandHandler("cleanup", handle_cleanup))
+def _register_handlers(application: Application) -> None:
+    application.add_handler(CommandHandler("start", start.handle_start))
+    application.add_handler(CommandHandler("help", help.handle_help))
+    application.add_handler(CommandHandler("quiz", quiz.handle_quiz))
+    application.add_handler(CommandHandler("words", words.handle_words))
+    application.add_handler(CommandHandler("delete", words.handle_delete))
+    application.add_handler(CommandHandler("settings", settings.handle_settings))
+    application.add_handler(CommandHandler("cleanup", cleanup.handle_cleanup))
+    application.add_handler(CommandHandler("upload", upload.handle_upload_command))
 
-    app.add_handler(CallbackQueryHandler(handle_show_answer, pattern=r"^show:"))
-    app.add_handler(CallbackQueryHandler(handle_rate, pattern=r"^rate:"))
-    app.add_handler(CallbackQueryHandler(handle_words_page, pattern=r"^words_page:"))
-    app.add_handler(CallbackQueryHandler(handle_toggle_setting, pattern=r"^setting:"))
-    app.add_handler(CallbackQueryHandler(handle_cleanup_page, pattern=r"^cleanup_page:"))
-    app.add_handler(CallbackQueryHandler(handle_cleanup_toggle, pattern=r"^cleanup_toggle:"))
-    app.add_handler(CallbackQueryHandler(handle_cleanup_confirm, pattern=r"^cleanup_confirm$"))
-    app.add_handler(CallbackQueryHandler(handle_cleanup_cancel, pattern=r"^cleanup_cancel$"))
+    # Photo & File Handlers
+    application.add_handler(MessageHandler(filters.PHOTO, upload.handle_photo))
 
-    # Must be last — catches all non-command text messages
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_add_word))
+    # General word addition
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, add_word.handle_add_word))
+
+    # Callback queries
+    application.add_handler(CallbackQueryHandler(quiz.handle_show_answer, pattern="^show:"))
+    application.add_handler(CallbackQueryHandler(quiz.handle_rate, pattern="^rate:"))
+    application.add_handler(CallbackQueryHandler(words.handle_words_page, pattern=r"^words_page:"))
+    application.add_handler(CallbackQueryHandler(settings.handle_toggle_setting, pattern="^setting:"))
+    application.add_handler(CallbackQueryHandler(cleanup.handle_cleanup_page, pattern="^cleanup_page:"))
+    application.add_handler(CallbackQueryHandler(cleanup.handle_cleanup_toggle, pattern="^cleanup_toggle:"))
+    application.add_handler(CallbackQueryHandler(cleanup.handle_cleanup_confirm, pattern="^cleanup_confirm$"))
+    application.add_handler(CallbackQueryHandler(cleanup.handle_cleanup_cancel, pattern="^cleanup_cancel$"))
+    application.add_handler(CallbackQueryHandler(upload.handle_upload_toggle, pattern="^upload_toggle:"))
+    application.add_handler(CallbackQueryHandler(upload.handle_upload_done, pattern="^upload_done$"))

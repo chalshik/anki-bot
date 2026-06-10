@@ -4,6 +4,7 @@ import os
 
 from google import genai
 from google.genai import types
+from google.genai.types import Part, GenerateContentConfig
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,41 @@ async def fetch_definition(word: str) -> dict | None:
     except Exception as e:
         logger.error("Gemini lookup failed for %r: %s. Raw response: %s", word, e, raw)
         return None
+
+
+async def extract_words_from_image(image_bytes: bytes) -> list[str]:
+    """Uses Gemini Vision to extract B2+ words from an image."""
+    try:
+        prompt = (
+            "Act as an English teacher. Extract all unique English words/short phrases from this image "
+            "that are at CEFR level B2, C1, or C2. Focus on academic, formal, or specialized vocabulary. "
+            "Return ONLY a JSON array of strings containing the words. "
+            "If no advanced words are found, return []."
+        )
+        
+        resp = await _get_client().aio.models.generate_content(
+            model="gemini-2.0-flash", # Vision stable
+            contents=[
+                Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+                prompt
+            ],
+            config=GenerateContentConfig(response_mime_type="application/json")
+        )
+        
+        raw = resp.text.strip()
+        # Strip fences if present
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            
+        data = json.loads(raw)
+        if isinstance(data, list):
+            return [str(w).lower() for w in data]
+        return []
+        
+    except Exception as e:
+        logger.error("Gemini image extraction failed: %s", e)
+        return []
+
 
 
 
