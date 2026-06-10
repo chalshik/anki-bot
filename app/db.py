@@ -214,13 +214,13 @@ async def update_card(card_id: str, card: Card) -> None:
     await _run(lambda: _db().table("cards").update(data).eq("id", card_id).execute())
 
 
-async def get_users_with_due_cards() -> list[tuple[int, str]]:
-    """Returns a list of (user_id, random_due_word) for all users with due cards."""
+async def get_users_with_due_cards() -> list[tuple[int, str, str]]:
+    """Returns a list of (user_id, word, card_id) for all users with due cards."""
     now_iso = datetime.now(timezone.utc).isoformat()
     # 1. Get all overdue cards joined with words
     result = await _run(
         lambda: _db().table("cards")
-        .select("due, words(user_id, word)")
+        .select("id, due, words(user_id, word)")
         .lte("due", now_iso)
         .execute()
     )
@@ -230,16 +230,30 @@ async def get_users_with_due_cards() -> list[tuple[int, str]]:
         return []
 
     # 2. Group by user_id and pick one random word per user
-    user_teasers = {} # {user_id: word}
+    user_teasers = {} # {user_id: (word, card_id)}
     import random
     for item in overdue:
         w = item.get("words")
         if not w: continue
         uid = w["user_id"]
         word = w["word"]
+        cid = item["id"]
         if uid not in user_teasers:
-            user_teasers[uid] = word
-        elif random.random() < 0.2: # Simple randomization to pick a different one sometimes
-            user_teasers[uid] = word
+            user_teasers[uid] = (word, cid)
+        elif random.random() < 0.2: # Simple randomization
+            user_teasers[uid] = (word, cid)
             
-    return list(user_teasers.items())
+    return [(uid, data[0], data[1]) for uid, data in user_teasers.items()]
+
+
+async def get_card_by_id(card_id: str) -> Optional[dict]:
+    """Fetch a single card with its word data."""
+    result = await _run(
+        lambda: _db().table("cards")
+        .select("*, words(*)")
+        .eq("id", card_id)
+        .limit(1)
+        .execute()
+    )
+    return result.data[0] if result.data else None
+

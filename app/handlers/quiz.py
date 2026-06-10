@@ -67,14 +67,17 @@ async def handle_show_answer(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     user_id = update.effective_user.id
     session = _sessions.get(user_id)
-    if session is None:
-        await query.edit_message_text("Session expired. Run /quiz to start again.")
+    
+    if session:
+        card_row = _find_card(session, card_id)
+    else:
+        # Mini-quiz case (e.g. from reminder)
+        card_row = await db.get_card_by_id(card_id)
+
+    if card_row is None:
+        await query.edit_message_text("Card not found. Run /quiz to start a new session.")
         return
 
-    card_row = _find_card(session, card_id)
-    if card_row is None:
-        await query.edit_message_text("Session mismatch. Run /quiz to start again.")
-        return
 
     settings = await db.get_user_settings(user_id)
     await _send_card_back(query.edit_message_text, card_row, settings)
@@ -88,34 +91,41 @@ async def handle_rate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     user_id = update.effective_user.id
     session = _sessions.get(user_id)
-    if session is None:
-        await query.edit_message_text("Session expired. Run /quiz to start again.")
+    
+    if session:
+        card_row = _find_card(session, card_id)
+    else:
+        card_row = await db.get_card_by_id(card_id)
+
+    if card_row is None:
+        await query.edit_message_text("Card not found.")
         return
 
-    card_row = _find_card(session, card_id)
-    if card_row is None:
-        await query.edit_message_text("Session mismatch. Run /quiz to start again.")
-        return
 
     # Run FSRS
     card = card_from_row(card_row)
     updated_card, _ = _scheduler.review_card(card, _RATING_MAP[rating_int])
     await db.update_card(card_id, updated_card)
 
-    session.reviewed += 1
-    session.index += 1
+    if session:
+        session.reviewed += 1
+        session.index += 1
 
-    if session.index < len(session.cards):
-        next_card = session.cards[session.index]
-        await _send_card_front(query.edit_message_text, next_card)
+        if session.index < len(session.cards):
+            next_card = session.cards[session.index]
+            await _send_card_front(query.edit_message_text, next_card)
+        else:
+            del _sessions[user_id]
+            total = session.reviewed
+            await query.edit_message_text(
+                f"🎉 Session complete!\n\n"
+                f"Reviewed: {total} card{'s' if total != 1 else ''}\n\n"
+                f"Run /quiz anytime to continue."
+            )
     else:
-        del _sessions[user_id]
-        total = session.reviewed
-        await query.edit_message_text(
-            f"🎉 Session complete!\n\n"
-            f"Reviewed: {total} card{'s' if total != 1 else ''}\n\n"
-            f"Run /quiz anytime to continue."
-        )
+        # End of mini-quiz
+        await query.edit_message_text("✅ Rating saved! Run /quiz for a full session.")
+
 
 
 # ---------- helpers ----------

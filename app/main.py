@@ -1,9 +1,10 @@
 import os
+import html
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Response
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 
 from . import db
 from .bot import create_application
@@ -52,12 +53,21 @@ async def remind(request: Request) -> Response:
         return Response(status_code=401)
 
     users_to_remind = await db.get_users_with_due_cards()
-    for user_id, word in users_to_remind:
+    for user_id, word, card_id in users_to_remind:
         try:
-            text = f"🛎 *Review Reminder!*\nYou have cards due for review. For example: *{word}*\n\nRun /quiz to start!"
-            await ptb_app.bot.send_message(chat_id=user_id, text=text, parse_mode="Markdown")
+            text = f'🛎 *Review Reminder!*\n\nWhat does <b>"{html.escape(word)}"</b> mean?'
+            markup = InlineKeyboardMarkup([[
+                InlineKeyboardButton("👁 Show answer", callback_data=f"show:{card_id}")
+            ]])
+            await ptb_app.bot.send_message(
+                chat_id=user_id, 
+                text=text, 
+                parse_mode="HTML",
+                reply_markup=markup
+            )
         except Exception:
-            continue # Skip users who blocked the bot
+            continue
+
             
     return Response(status_code=200)
 
