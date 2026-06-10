@@ -21,7 +21,7 @@ _CONFIG = types.GenerateContentConfig(
     system_instruction=_SYSTEM,
     response_mime_type="application/json",
     temperature=0.1,
-    max_output_tokens=300,
+    max_output_tokens=1000,
 )
 
 
@@ -37,6 +37,7 @@ def _get_client() -> genai.Client:
 
 
 async def fetch_definition(word: str) -> dict | None:
+    raw = ""
     try:
         resp = await _get_client().aio.models.generate_content(
             model="gemini-2.5-flash",
@@ -51,8 +52,9 @@ async def fetch_definition(word: str) -> dict | None:
             raw = raw.rsplit("```", 1)[0]  # drop closing fence
         data = json.loads(raw)
     except Exception as e:
-        logger.error("Gemini lookup failed for %r: %s", word, e)
+        logger.error("Gemini lookup failed for %r: %s. Raw response: %s", word, e, raw)
         return None
+
 
 
     if not data.get("found"):
