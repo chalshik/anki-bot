@@ -15,6 +15,7 @@ SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "local")
+REMIND_TOKEN = os.getenv("REMIND_TOKEN", "")
 
 ptb_app = create_application(
     token=TELEGRAM_BOT_TOKEN,
@@ -42,6 +43,23 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.post("/remind")
+async def remind(request: Request) -> Response:
+    token = request.headers.get("X-Remind-Token")
+    if not REMIND_TOKEN or token != REMIND_TOKEN:
+        return Response(status_code=401)
+
+    users_to_remind = await db.get_users_with_due_cards()
+    for user_id, word in users_to_remind:
+        try:
+            text = f"🛎 *Review Reminder!*\nYou have cards due for review. For example: *{word}*\n\nRun /quiz to start!"
+            await ptb_app.bot.send_message(chat_id=user_id, text=text, parse_mode="Markdown")
+        except Exception:
+            continue # Skip users who blocked the bot
+            
+    return Response(status_code=200)
 
 
 @app.post("/webhook")

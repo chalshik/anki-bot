@@ -212,3 +212,34 @@ async def get_next_due(user_id: int) -> Optional[datetime]:
 async def update_card(card_id: str, card: Card) -> None:
     data = card_to_dict(card)
     await _run(lambda: _db().table("cards").update(data).eq("id", card_id).execute())
+
+
+async def get_users_with_due_cards() -> list[tuple[int, str]]:
+    """Returns a list of (user_id, random_due_word) for all users with due cards."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    # 1. Get all overdue cards joined with words
+    result = await _run(
+        lambda: _db().table("cards")
+        .select("due, words(user_id, word)")
+        .lte("due", now_iso)
+        .execute()
+    )
+    
+    overdue = result.data or []
+    if not overdue:
+        return []
+
+    # 2. Group by user_id and pick one random word per user
+    user_teasers = {} # {user_id: word}
+    import random
+    for item in overdue:
+        w = item.get("words")
+        if not w: continue
+        uid = w["user_id"]
+        word = w["word"]
+        if uid not in user_teasers:
+            user_teasers[uid] = word
+        elif random.random() < 0.2: # Simple randomization to pick a different one sometimes
+            user_teasers[uid] = word
+            
+    return list(user_teasers.items())
